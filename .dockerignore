@@ -1,3 +1,10 @@
-.cache
-build
 node_modules
+npm-debug.log
+.git
+.gitignore
+.env
+*.md
+.cache
+dist
+coverage
+.docker

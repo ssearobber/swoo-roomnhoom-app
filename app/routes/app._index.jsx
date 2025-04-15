@@ -91,7 +91,7 @@ export const loader = async ({ request }) => {
         };
       })
     )
-    .filter(order => order.brand === 'MARKET B')
+    .filter(order => order.brand === 'Roomnhome')
     .sort((a, b) => b.orderId.localeCompare(a.orderId));
     return json({ orders });
   } catch (error) {

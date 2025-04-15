@@ -3,7 +3,7 @@
 client_id = "ad128ec106a47335e9e98801f0251948"
 name = "swoo-roomnhoom-app"
 handle = "swoo-roomnhoom-app"
-application_url = "https://machine-poem-boulevard-cook.trycloudflare.com"
+application_url = "https://penalty-including-folders-geographic.trycloudflare.com"
 embedded = true
 
 [build]
@@ -17,9 +17,9 @@ scopes = "read_customers,read_orders,read_products"
 
 [auth]
 redirect_urls = [
-  "https://machine-poem-boulevard-cook.trycloudflare.com/auth/callback",
-  "https://machine-poem-boulevard-cook.trycloudflare.com/auth/shopify/callback",
-  "https://machine-poem-boulevard-cook.trycloudflare.com/api/auth/callback"
+  "https://penalty-including-folders-geographic.trycloudflare.com/auth/callback",
+  "https://penalty-including-folders-geographic.trycloudflare.com/auth/shopify/callback",
+  "https://penalty-including-folders-geographic.trycloudflare.com/api/auth/callback"
 ]
 
 [webhooks]

@@ -211,14 +211,14 @@ export default function Index() {
                   selectedItemsCount={allResourcesSelected ? 'All' : selectedResources.length}
                   onSelectionChange={handleSelectionChange}
                   headings={[
-                    { title: 'Order' },
-                    { title: 'Product Name' },
-                    { title: 'Brand' },
-                    { title: 'Variant' },
-                    { title: 'Quantity' },
-                    { title: 'Name' },
-                    { title: 'Address' },
-                    { title: 'URL' }
+                    { title: '주문번호' },
+                    { title: '상품명' },
+                    { title: '브랜드' },
+                    { title: '색상' },
+                    { title: '수량' },
+                    { title: '고객이름' },
+                    { title: '고객주소' },
+                    { title: '상품URL' }
                   ]}
                 >
                   {rowMarkup}

@@ -1,32 +1,198 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
-// Note that some adapters may set a maximum length for the String type by default, please ensure your strings are long
-// enough when changing adapters.
-// See https://www.prisma.io/docs/orm/reference/prisma-schema-reference#string for more information
 datasource db {
-  provider = "sqlite"
-  url      = "file:dev.sqlite"
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Store {
+  id        String     @id
+  createdAt DateTime?  @default(now())
+  updatedAt DateTime?  @updatedAt
+  customers Customer[]
+  orders    Order[]
+  products  Product[]
+  sessions  Session[]
+}
+
+model KseInformation {
+  id        String    @id
+  sessionId String    @unique
+  apiKey    String
+  isActive  Boolean?
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @updatedAt
+  session   Session   @relation(fields: [sessionId], references: [id])
 }
 
 model Session {
-  id            String    @id
+  id            String          @id
   shop          String
   state         String
-  isOnline      Boolean   @default(false)
+  isOnline      Boolean         @default(false)
   scope         String?
   expires       DateTime?
   accessToken   String
   userId        BigInt?
-  firstName     String?
-  lastName      String?
-  email         String?
-  accountOwner  Boolean   @default(false)
-  locale        String?
-  collaborator  Boolean?  @default(false)
-  emailVerified Boolean?  @default(false)
+  firstName     String? // 추가
+  lastName      String? // 추가
+  email         String? // 추가
+  accountOwner  Boolean         @default(false) // 추가
+  locale        String? // 추가
+  collaborator  Boolean         @default(false) // 추가
+  emailVerified Boolean         @default(false) // 추가
+  store         Store?          @relation(fields: [shop], references: [id])
+  kseInfo       KseInformation?
+
+  @@index([shop], map: "Product_storeId_fkey")
+}
+
+model Product {
+  id               String           @id
+  shopifyProductId String
+  storeId          String
+  title            String
+  description      String?          @db.Text
+  status           String
+  createdAt        DateTime?        @default(now())
+  updatedAt        DateTime?        @updatedAt
+  likes            Like[]
+  store            Store            @relation(fields: [storeId], references: [id])
+  variants         ProductVariant[]
+
+  @@index([storeId], map: "Product_storeId_fkey")
+}
+
+model ProductVariant {
+  id                String      @id
+  shopifyVariantId  String
+  productId         String
+  title             String
+  sku               String?
+  price             Decimal     @db.Decimal(10, 2)
+  compareAtPrice    Decimal?    @db.Decimal(10, 2)
+  inventoryQuantity Int
+  createdAt         DateTime?   @default(now())
+  updatedAt         DateTime?   @updatedAt
+  orderItems        OrderItem[]
+  product           Product     @relation(fields: [productId], references: [id])
+
+  @@index([productId], map: "ProductVariant_productId_fkey")
+}
+
+model Customer {
+  id                String            @id
+  shopifyCustomerId String
+  storeId           String
+  firstName         String?
+  lastName          String?
+  email             String?
+  phone             String?
+  isDeleted         Boolean?
+  createdAt         DateTime?         @default(now())
+  updatedAt         DateTime?         @updatedAt
+  store             Store             @relation(fields: [storeId], references: [id])
+  addresses         CustomerAddress[]
+  likes             Like[]
+  orders            Order[]
+
+  @@index([storeId], map: "Customer_storeId_fkey")
+}
+
+model CustomerAddress {
+  id               String           @id
+  shopifyAddressId String
+  customerId       String
+  address1         String
+  address2         String?
+  city             String
+  province         String?
+  zip              String
+  country          String
+  isDefault        Boolean?
+  createdAt        DateTime?        @default(now())
+  updatedAt        DateTime?        @updatedAt
+  addressHistories AddressHistory[]
+  customer         Customer         @relation(fields: [customerId], references: [id])
+
+  @@index([customerId], map: "CustomerAddress_customerId_fkey")
+}
+
+model AddressHistory {
+  id               String          @id
+  addressId        String
+  previousAddress1 String
+  previousAddress2 String?
+  previousCity     String
+  previousProvince String?
+  previousZip      String
+  previousCountry  String
+  changedAt        DateTime?       @default(now())
+  customerAddress  CustomerAddress @relation(fields: [addressId], references: [id])
+
+  @@index([addressId], map: "AddressHistory_addressId_fkey")
+}
+
+model Order {
+  id             String        @id
+  shopifyOrderId String
+  storeId        String
+  customerId     String
+  orderNumber    String
+  totalPrice     Decimal       @db.Decimal(10, 2)
+  status         String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  customer       Customer      @relation(fields: [customerId], references: [id])
+  store          Store         @relation(fields: [storeId], references: [id])
+  orderAddress   OrderAddress?
+  items          OrderItem[]
+
+  @@index([customerId], map: "Order_customerId_fkey")
+  @@index([storeId], map: "Order_storeId_fkey")
+}
+
+model OrderItem {
+  id        String         @id
+  orderId   String
+  variantId String
+  quantity  Int
+  price     Float
+  createdAt DateTime?      @default(now())
+  updatedAt DateTime?      @updatedAt
+  order     Order          @relation(fields: [orderId], references: [id])
+  variant   ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([orderId], map: "OrderItem_orderId_fkey")
+  @@index([variantId], map: "OrderItem_variantId_fkey")
+}
+
+model OrderAddress {
+  id        String    @id
+  orderId   String    @unique
+  address1  String
+  address2  String?
+  city      String
+  province  String?
+  zip       String
+  country   String
+  createdAt DateTime? @default(now())
+  updatedAt DateTime? @updatedAt
+  order     Order     @relation(fields: [orderId], references: [id])
+}
+
+model Like {
+  id         String    @id
+  customerId String
+  productId  String
+  isActive   Boolean?
+  createdAt  DateTime? @default(now())
+  updatedAt  DateTime? @updatedAt
+  customer   Customer  @relation(fields: [customerId], references: [id])
+  product    Product   @relation(fields: [productId], references: [id])
+
+  @@index([customerId], map: "Like_customerId_fkey")
+  @@index([productId], map: "Like_productId_fkey")
 }

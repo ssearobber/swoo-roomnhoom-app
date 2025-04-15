@@ -1,328 +1,236 @@
-import { useEffect } from "react";
-import { useFetcher } from "@remix-run/react";
+import { useEffect, useState } from "react";
+import { json } from "@remix-run/node";
+import { useLoaderData, useActionData, Form, useNavigation, useRevalidator } from "@remix-run/react";
 import {
   Page,
   Layout,
   Text,
   Card,
-  Button,
-  BlockStack,
-  Box,
-  List,
+  IndexTable,
+  useIndexResourceState,
+  Frame,
   Link,
-  InlineStack,
 } from "@shopify/polaris";
-import { TitleBar, useAppBridge } from "@shopify/app-bridge-react";
 import { authenticate } from "../shopify.server";
+import kseApi from "../utils/kse";
+import LoadingSpinner from "../components/LoadingSpinner";
 
-export const loader = async ({ request }) => {
-  await authenticate.admin(request);
-
-  return null;
-};
-
-export const action = async ({ request }) => {
-  const { admin } = await authenticate.admin(request);
-  const color = ["Red", "Orange", "Yellow", "Green"][
-    Math.floor(Math.random() * 4)
-  ];
-  const response = await admin.graphql(
-    `#graphql
-      mutation populateProduct($product: ProductCreateInput!) {
-        productCreate(product: $product) {
-          product {
-            id
-            title
-            handle
-            status
-            variants(first: 10) {
-              edges {
-                node {
+async function fetchOrders(admin) {
+  const query = `
+    query getOrders {
+      orders (first:150, query: "fulfillment_status:unfulfilled") {
+        nodes {
+          name
+          id
+          customer {
+            displayName
+            defaultAddress {
+              address1
+              address2
+              city
+              province
+              zip
+              country
+            }
+          }
+          lineItems(first: 10) {
+            edges {
+              node {
+                title
+                quantity
+                variant {
+                  title
+                }
+                product {
                   id
-                  price
-                  barcode
-                  createdAt
+                  vendor
+                  metafields(first: 10, namespace: "custom") {
+                    edges {
+                      node {
+                        key
+                        value
+                      }
+                    }
+                  }
                 }
               }
             }
           }
         }
-      }`,
-    {
-      variables: {
-        product: {
-          title: `${color} Snowboard`,
-        },
-      },
-    },
-  );
-  const responseJson = await response.json();
-  const product = responseJson.data.productCreate.product;
-  const variantId = product.variants.edges[0].node.id;
-  const variantResponse = await admin.graphql(
-    `#graphql
-    mutation shopifyRemixTemplateUpdateVariant($productId: ID!, $variants: [ProductVariantsBulkInput!]!) {
-      productVariantsBulkUpdate(productId: $productId, variants: $variants) {
-        productVariants {
-          id
-          price
-          barcode
-          createdAt
-        }
       }
-    }`,
-    {
-      variables: {
-        productId: product.id,
-        variants: [{ id: variantId, price: "100.00" }],
-      },
-    },
-  );
-  const variantResponseJson = await variantResponse.json();
+    }
+  `;
+  const response = await admin.graphql(query);
+  return response.json();
+}
 
-  return {
-    product: responseJson.data.productCreate.product,
-    variant: variantResponseJson.data.productVariantsBulkUpdate.productVariants,
-  };
+export const loader = async ({ request }) => {
+  try {
+    const { admin } = await authenticate.admin(request);
+    const data = await fetchOrders(admin);
+    const orders = data.data.orders.nodes.flatMap(node => 
+      node.lineItems.edges.map((edge, index) => {
+        const product = edge.node.product;
+        const metafields = product?.metafields?.edges || [];
+        const urlMetafield = metafields.find(m => m.node.key === 'url')?.node?.value || '';
+        const productNameMetafield = metafields.find(m => m.node.key === 'product_name')?.node?.value || '';
+        
+        return {
+          id: `${node.name}-${index}`,
+          orderId: node.name,
+          order: node.id,
+          displayName: node.customer?.displayName || 'No name',
+          address: node.customer?.defaultAddress ? 
+            `${node.customer.defaultAddress.address1} ${node.customer.defaultAddress.address2 || ''}, ${node.customer.defaultAddress.city}, ${node.customer.defaultAddress.province} ${node.customer.defaultAddress.zip}, ${node.customer.defaultAddress.country}` 
+            : 'No address',
+          variantTitle: edge.node.variant?.title || '',
+          quantity: edge.node.quantity,
+          brand: product?.vendor || '',
+          url: urlMetafield,
+          productName: productNameMetafield
+        };
+      })
+    )
+    .filter(order => order.brand === 'MARKET B')
+    .sort((a, b) => b.orderId.localeCompare(a.orderId));
+    return json({ orders });
+  } catch (error) {
+    console.error('app._index Loader Error:', error);
+    return json({ orders: [] });
+  }
+};
+
+export const action = async ({ request }) => {
+  const { admin } = await authenticate.admin(request);
+  const formData = await request.formData();
+  const selectedOrders = formData.getAll('selectedOrder');
+  const results = [];
+
+  try {
+    for (const selectedOrder of selectedOrders) {
+      const [orderId, lineItemIndex] = selectedOrder.split('-');
+      const response = await kseApi(orderId, admin, lineItemIndex);
+      results.push(response);
+    }
+    return json({ success: true, message: 'KSE 시스템에 성공적으로 전송되었습니다.', results });
+  } catch (error) {
+    console.error('app._index action Error:', error);
+    return json({ success: false, error: 'KSE API 호출에 실패했습니다.' }, { status: 500 });
+  }
 };
 
 export default function Index() {
-  const fetcher = useFetcher();
-  const shopify = useAppBridge();
-  const isLoading =
-    ["loading", "submitting"].includes(fetcher.state) &&
-    fetcher.formMethod === "POST";
-  const productId = fetcher.data?.product?.id.replace(
-    "gid://shopify/Product/",
-    "",
-  );
+  const { orders } = useLoaderData();
+  const actionData = useActionData();
+  const navigation = useNavigation();
+  const revalidator = useRevalidator();
+  const { selectedResources, allResourcesSelected, handleSelectionChange } =
+    useIndexResourceState(orders);
+
+  const isLoading = navigation.state === "submitting";
+
+  // 데이터 체크
+  if (!orders || !Array.isArray(orders)) {
+    return <div>주문 데이터가 없습니다.</div>;
+  }
 
   useEffect(() => {
-    if (productId) {
-      shopify.toast.show("Product created");
+    if (actionData?.success) {
+      shopify.toast.show(actionData.message);
+    } else if (actionData?.error) {
+      shopify.toast.show(actionData.error);
     }
-  }, [productId, shopify]);
-  const generateProduct = () => fetcher.submit({}, { method: "POST" });
+  }, [actionData]);
+
+  const rowMarkup = orders.map(({ id, orderId, displayName, address, variantTitle, quantity, brand, url, productName }, index) => (
+    <IndexTable.Row id={id} key={id} selected={selectedResources.includes(id)} position={index}>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" fontWeight="bold" as="span">
+          {orderId} - {id.split('-')[1]}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" as="span">
+          {productName}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" as="span">
+          {brand}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" as="span">
+          {variantTitle}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" as="span">
+          {quantity}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" as="span">
+          {displayName}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" as="span">
+          {address}
+        </Text>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
+        <Text variant="bodyMd" as="span">
+          {url ? (
+            <Link url={url} external target="_blank" onClick={(e) => e.stopPropagation()}>
+              {url}
+            </Link>
+          ) : ''}
+        </Text>
+      </IndexTable.Cell>
+    </IndexTable.Row>
+  ));
 
   return (
-    <Page>
-      <TitleBar title="Remix app template">
-        <button variant="primary" onClick={generateProduct}>
-          Generate a product
-        </button>
-      </TitleBar>
-      <BlockStack gap="500">
-        <Layout>
-          <Layout.Section>
-            <Card>
-              <BlockStack gap="500">
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    Congrats on creating a new Shopify app 🎉
-                  </Text>
-                  <Text variant="bodyMd" as="p">
-                    This embedded app template uses{" "}
-                    <Link
-                      url="https://shopify.dev/docs/apps/tools/app-bridge"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      App Bridge
-                    </Link>{" "}
-                    interface examples like an{" "}
-                    <Link url="/app/additional" removeUnderline>
-                      additional page in the app nav
-                    </Link>
-                    , as well as an{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      Admin GraphQL
-                    </Link>{" "}
-                    mutation demo, to provide a starting point for app
-                    development.
-                  </Text>
-                </BlockStack>
-                <BlockStack gap="200">
-                  <Text as="h3" variant="headingMd">
-                    Get started with products
-                  </Text>
-                  <Text as="p" variant="bodyMd">
-                    Generate a product with GraphQL and get the JSON output for
-                    that product. Learn more about the{" "}
-                    <Link
-                      url="https://shopify.dev/docs/api/admin-graphql/latest/mutations/productCreate"
-                      target="_blank"
-                      removeUnderline
-                    >
-                      productCreate
-                    </Link>{" "}
-                    mutation in our API references.
-                  </Text>
-                </BlockStack>
-                <InlineStack gap="300">
-                  <Button loading={isLoading} onClick={generateProduct}>
-                    Generate a product
-                  </Button>
-                  {fetcher.data?.product && (
-                    <Button
-                      url={`shopify:admin/products/${productId}`}
-                      target="_blank"
-                      variant="plain"
-                    >
-                      View product
-                    </Button>
-                  )}
-                </InlineStack>
-                {fetcher.data?.product && (
-                  <>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productCreate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.product, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                    <Text as="h3" variant="headingMd">
-                      {" "}
-                      productVariantsBulkUpdate mutation
-                    </Text>
-                    <Box
-                      padding="400"
-                      background="bg-surface-active"
-                      borderWidth="025"
-                      borderRadius="200"
-                      borderColor="border"
-                      overflowX="scroll"
-                    >
-                      <pre style={{ margin: 0 }}>
-                        <code>
-                          {JSON.stringify(fetcher.data.variant, null, 2)}
-                        </code>
-                      </pre>
-                    </Box>
-                  </>
-                )}
-              </BlockStack>
-            </Card>
-          </Layout.Section>
-          <Layout.Section variant="oneThird">
-            <BlockStack gap="500">
+    <Frame>
+      <Page fullWidth>
+        <Form method="POST">
+          <ui-title-bar title="">
+            <button type="button" variant="secondary" onClick={() => revalidator.revalidate()} style={{ marginRight: '10px' }}>
+              Refresh
+            </button>
+            <button type="submit" variant="primary" disabled={isLoading}>Submit</button>
+          </ui-title-bar>
+          {isLoading && <LoadingSpinner />}
+          <Layout>
+            <Layout.Section>
               <Card>
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    App template specs
-                  </Text>
-                  <BlockStack gap="200">
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Framework
-                      </Text>
-                      <Link
-                        url="https://remix.run"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Remix
-                      </Link>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Database
-                      </Text>
-                      <Link
-                        url="https://www.prisma.io/"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        Prisma
-                      </Link>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        Interface
-                      </Text>
-                      <span>
-                        <Link
-                          url="https://polaris.shopify.com"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          Polaris
-                        </Link>
-                        {", "}
-                        <Link
-                          url="https://shopify.dev/docs/apps/tools/app-bridge"
-                          target="_blank"
-                          removeUnderline
-                        >
-                          App Bridge
-                        </Link>
-                      </span>
-                    </InlineStack>
-                    <InlineStack align="space-between">
-                      <Text as="span" variant="bodyMd">
-                        API
-                      </Text>
-                      <Link
-                        url="https://shopify.dev/docs/api/admin-graphql"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphQL API
-                      </Link>
-                    </InlineStack>
-                  </BlockStack>
-                </BlockStack>
+                <IndexTable
+                  resourceName={{ singular: 'order', plural: 'orders' }}
+                  itemCount={orders.length}
+                  selectedItemsCount={allResourcesSelected ? 'All' : selectedResources.length}
+                  onSelectionChange={handleSelectionChange}
+                  headings={[
+                    { title: 'Order' },
+                    { title: 'Product Name' },
+                    { title: 'Brand' },
+                    { title: 'Variant' },
+                    { title: 'Quantity' },
+                    { title: 'Name' },
+                    { title: 'Address' },
+                    { title: 'URL' }
+                  ]}
+                >
+                  {rowMarkup}
+                </IndexTable>
+                {selectedResources.map(resourceId => (
+                  <input type="hidden" name="selectedOrder" value={resourceId} key={resourceId} />
+                ))}
               </Card>
-              <Card>
-                <BlockStack gap="200">
-                  <Text as="h2" variant="headingMd">
-                    Next steps
-                  </Text>
-                  <List>
-                    <List.Item>
-                      Build an{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/getting-started/build-app-example"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        {" "}
-                        example app
-                      </Link>{" "}
-                      to get started
-                    </List.Item>
-                    <List.Item>
-                      Explore Shopify’s API with{" "}
-                      <Link
-                        url="https://shopify.dev/docs/apps/tools/graphiql-admin-api"
-                        target="_blank"
-                        removeUnderline
-                      >
-                        GraphiQL
-                      </Link>
-                    </List.Item>
-                  </List>
-                </BlockStack>
-              </Card>
-            </BlockStack>
-          </Layout.Section>
-        </Layout>
-      </BlockStack>
-    </Page>
+            </Layout.Section>
+          </Layout>
+        </Form>
+      </Page>
+    </Frame>
   );
 }

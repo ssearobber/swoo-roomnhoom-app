@@ -1,30 +1,40 @@
-import { Link, Outlet, useLoaderData, useRouteError } from "@remix-run/react";
+import { json } from "@remix-run/node";
+import { Link, Outlet, useLoaderData, useRouteError, useNavigation } from "@remix-run/react";
 import { boundary } from "@shopify/shopify-app-remix/server";
 import { AppProvider } from "@shopify/shopify-app-remix/react";
-import { NavMenu } from "@shopify/app-bridge-react";
 import polarisStyles from "@shopify/polaris/build/esm/styles.css?url";
 import { authenticate } from "../shopify.server";
+import LoadingSpinner from "../components/LoadingSpinner";
 
 export const links = () => [{ rel: "stylesheet", href: polarisStyles }];
 
 export const loader = async ({ request }) => {
   await authenticate.admin(request);
 
-  return { apiKey: process.env.SHOPIFY_API_KEY || "" };
+  return json({ apiKey: process.env.SHOPIFY_API_KEY || "" });
 };
 
 export default function App() {
   const { apiKey } = useLoaderData();
+  const navigation = useNavigation();
 
   return (
     <AppProvider isEmbeddedApp apiKey={apiKey}>
-      <NavMenu>
+      <ui-nav-menu>
         <Link to="/app" rel="home">
           Home
         </Link>
-        <Link to="/app/additional">Additional page</Link>
-      </NavMenu>
-      <Outlet />
+        <Link to="/app/settings">settings</Link>
+      </ui-nav-menu>
+      <div style={{ 
+        position: 'relative',
+        minHeight: '100vh',
+        transition: 'opacity 0.3s ease-in-out',
+        opacity: navigation.state === 'loading' ? 0.7 : 1
+      }}>
+        {navigation.state === 'loading' && <LoadingSpinner />}
+        <Outlet />
+      </div>
     </AppProvider>
   );
 }

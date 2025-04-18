@@ -24,7 +24,9 @@ export default function App() {
         <Link to="/app" rel="home">
           Home
         </Link>
-        <Link to="/app/settings">settings</Link>
+        <Link to="/app/manual">메뉴얼</Link>
+        <Link to="/app/orders">주문</Link>
+        <Link to="/app/settings">설정</Link>
       </ui-nav-menu>
       <div style={{ 
         position: 'relative',

@@ -33,16 +33,32 @@ async function fetchOrders(admin) {
               country
             }
           }
+          shippingAddress {
+            address1
+            address2
+            city
+            province
+            zip
+            country
+            firstName
+            lastName
+            phone
+          }
           lineItems(first: 10) {
             edges {
               node {
                 title
                 quantity
+                originalUnitPriceSet {
+                  shopMoney {
+                    amount
+                    currencyCode
+                  }
+                }
                 variant {
                   title
                 }
                 product {
-                  id
                   vendor
                   metafields(first: 10, namespace: "custom") {
                     edges {
@@ -79,15 +95,22 @@ export const loader = async ({ request }) => {
           id: `${node.name}-${index}`,
           orderId: node.name,
           order: node.id,
-          displayName: node.customer?.displayName || 'No name',
-          address: node.customer?.defaultAddress ? 
-            `${node.customer.defaultAddress.address1} ${node.customer.defaultAddress.address2 || ''}, ${node.customer.defaultAddress.city}, ${node.customer.defaultAddress.province} ${node.customer.defaultAddress.zip}, ${node.customer.defaultAddress.country}` 
-            : 'No address',
+          displayName: node.shippingAddress ? 
+            `${node.shippingAddress.firstName} ${node.shippingAddress.lastName}` : 
+            node.customer?.displayName || 'No name',
+          address: node.shippingAddress ? 
+            `${node.shippingAddress.address1} ${node.shippingAddress.address2 || ''}, ${node.shippingAddress.city}, ${node.shippingAddress.province} ${node.shippingAddress.zip}, ${node.shippingAddress.country}` 
+            : node.customer?.defaultAddress ? 
+              `${node.customer.defaultAddress.address1} ${node.customer.defaultAddress.address2 || ''}, ${node.customer.defaultAddress.city}, ${node.customer.defaultAddress.province} ${node.customer.defaultAddress.zip}, ${node.customer.defaultAddress.country}` 
+              : 'No address',
+          shippingAddress: node.shippingAddress,
+          productTitle: productNameMetafield || edge.node.title,
           variantTitle: edge.node.variant?.title || '',
           quantity: edge.node.quantity,
-          brand: product?.vendor || '',
-          url: urlMetafield,
-          productName: productNameMetafield
+          price: edge.node.originalUnitPriceSet?.shopMoney?.amount || 0,
+          currency: edge.node.originalUnitPriceSet?.shopMoney?.currencyCode || 'JPY',
+          brand: edge.node.product?.vendor || '',
+          url: urlMetafield
         };
       })
     )
@@ -107,9 +130,39 @@ export const action = async ({ request }) => {
   const results = [];
 
   try {
+    // 현재 주문 목록을 다시 가져옵니다
+    const data = await fetchOrders(admin);
+    const currentOrders = data.data.orders.nodes.flatMap(node => 
+      node.lineItems.edges.map((edge, index) => ({
+        id: `${node.name}-${index}`,
+        orderId: node.name,
+        order: node.id,
+        displayName: node.shippingAddress ? 
+          `${node.shippingAddress.firstName} ${node.shippingAddress.lastName}` : 
+          node.customer?.displayName || 'No name',
+        address: node.shippingAddress ? 
+          `${node.shippingAddress.address1} ${node.shippingAddress.address2 || ''}, ${node.shippingAddress.city}, ${node.shippingAddress.province} ${node.shippingAddress.zip}, ${node.shippingAddress.country}` 
+          : node.customer?.defaultAddress ? 
+            `${node.customer.defaultAddress.address1} ${node.customer.defaultAddress.address2 || ''}, ${node.customer.defaultAddress.city}, ${node.customer.defaultAddress.province} ${node.customer.defaultAddress.zip}, ${node.customer.defaultAddress.country}` 
+            : 'No address',
+        shippingAddress: node.shippingAddress,
+        productTitle: edge.node.title,
+        variantTitle: edge.node.variant?.title || '',
+        quantity: edge.node.quantity,
+        price: edge.node.originalUnitPriceSet?.shopMoney?.amount || 0,
+        currency: edge.node.originalUnitPriceSet?.shopMoney?.currencyCode || 'JPY',
+        brand: edge.node.product?.vendor || ''
+      }))
+    );
+
     for (const selectedOrder of selectedOrders) {
       const [orderId, lineItemIndex] = selectedOrder.split('-');
-      const response = await kseApi(orderId, admin, lineItemIndex);
+      // 선택된 주문 정보 찾기
+      const selectedOrderData = currentOrders.find(order => order.id === selectedOrder);
+      if (!selectedOrderData) {
+        throw new Error(`주문 ${selectedOrder}을 찾을 수 없습니다.`);
+      }
+      const response = await kseApi(selectedOrderData, admin, parseInt(lineItemIndex));
       results.push(response);
     }
     return json({ success: true, message: 'KSE 시스템에 성공적으로 전송되었습니다.', results });
@@ -142,7 +195,7 @@ export default function Index() {
     }
   }, [actionData]);
 
-  const rowMarkup = orders.map(({ id, orderId, displayName, address, variantTitle, quantity, brand, url, productName }, index) => (
+  const rowMarkup = orders.map(({ id, orderId, displayName, address, productTitle, variantTitle, quantity, brand, url }, index) => (
     <IndexTable.Row id={id} key={id} selected={selectedResources.includes(id)} position={index}>
       <IndexTable.Cell>
         <Text variant="bodyMd" fontWeight="bold" as="span">
@@ -151,7 +204,7 @@ export default function Index() {
       </IndexTable.Cell>
       <IndexTable.Cell>
         <Text variant="bodyMd" as="span">
-          {productName}
+          {productTitle}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>

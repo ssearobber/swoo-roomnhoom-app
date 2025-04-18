@@ -2,117 +2,91 @@ import { json } from "@remix-run/node";
 import axios from 'axios';
 import https from 'https';
 import db from "../db.server";
-import googleOrderSheet from './googleSheets/googleOrderSheet.js';
-
-async function fetchOrders(id, admin) {
-    return await admin.rest.resources.Order.all({
-        session: admin.rest.session,
-        status: "any",
-        query: `name:${id}`,
-    });
-}
 
 async function formatLineItems(order, orderName, lineItemIndex) {
     console.log(`[주문 품목 처리] 주문번호 ${orderName}의 품목 처리 시작`);
     
-    // 특정 라인 아이템만 처리
-    const item = order.line_items[lineItemIndex];
-    if (!item) {
-        throw new Error(`라인 아이템 인덱스 ${lineItemIndex}를 찾을 수 없습니다.`);
-    }
-
     try {
-        const orderNumber = await googleOrderSheet(
-            order.id, 
-            orderName, 
-            item.variant_title,
-            item.product_id
-        );
-        console.log(`[주문 품목 처리] 품목 ${order.id}의 주문번호 조회 완료: ${orderNumber}`);
+        // 주문번호에서 숫자만 추출
+        const orderNumber = order.order.match(/\d+/)?.[0] || order.order;
         
         return [{
-            GoodsOrderNo: order.id,
-            GoodsCode: order.id,
-            Title: item.title,
+            GoodsOrderNo: orderNumber,
+            GoodsCode: orderNumber,
+            Title: order.productTitle,
             TitleEng: "",
             SKU: "",
             HSCODE: "",
-            Qty: item.quantity,
-            UnitPrice: item.price,
-            Currency: "JPY",
-            BrandName: "",
+            Qty: order.quantity,
+            UnitPrice: order.price,
+            Currency: order.currency,
+            BrandName: order.brand,
             GoodsUrl: "",
             ImageUrl: "",
             Origin: "",
             Material: "",
             OptionCode: "",
-            OptionName: item.variant_title + " - "+ orderNumber
+            OptionName: order.variantTitle
         }];
     } catch (error) {
-        console.error(`[주문 품목 처리] 품목 ${order.id} 처리 중 오류 발생:`, error);
+        console.error(`[주문 품목 처리] 품목 ${order.order} 처리 중 오류 발생:`, error);
         throw error;
     }
 }
 
-async function formatOrderData(orders, lineItemIndex) {
+async function formatOrderData(order, lineItemIndex) {
     console.log('[주문 데이터 변환] 주문 데이터 변환 시작');
     
-    if (!orders?.data) {
-        console.error("[주문 데이터 변환] 유효하지 않은 주문 데이터:", orders);
-        return [];
-    }
+    try {
+        console.log(`[주문 데이터 변환] 주문번호 ${order.orderId} 처리 중`);
+        const lineItemsWithOrderNumber = await formatLineItems(order, order.orderId, lineItemIndex);
 
-    if (!Array.isArray(orders.data)) {
-        console.error("[주문 데이터 변환] orders.data가 배열이 아님:", orders.data);
-        return [];
-    }
-
-    return Promise.all(orders.data.map(async order => {
-        try {
-            console.log(`[주문 데이터 변환] 주문번호 ${order.name} 처리 중`);
-            const lineItemsWithOrderNumber = await formatLineItems(order, order.name, lineItemIndex);
-
-            return {
-                PackageNo: `${order.name}-${lineItemIndex}`,
-                PackageNo2: "",
-                DeliveryServiceCode: "KSE",
-                TrackingNo: "",
-                ToCountry: "JP",
-                ReceiverName: `${order.customer.default_address.first_name} ${order.customer.default_address.last_name}`,
-                ReceiverNameYomigana: `${order.customer.default_address.first_name} ${order.customer.default_address.last_name}`,
-                ReceiverTelNo: order.customer.default_address.phone,
-                ReceiverTelNo2: "",
-                ReceiverEmail: order.customer.email,
-                ReceiverSocialNo: "",
-                ReceiverZipCode: order.customer.default_address.zip,
-                ReceiverFullAddr: `${order.customer.default_address.province || ''} ${order.customer.default_address.city || ''} ${order.customer.default_address.address1 || ''} ${order.customer.default_address.address2 || ''}`,
-                ReceiverStreet: "",
-                ReceiverCity: "",
-                ReceiverState: "",
-                ReceiverNameEng: "",
-                ReceiverFullAddrEng: "",
-                ReceiverStreetEng: "",
-                ReceiverStateEng: "",
-                ReceiverCityEng: "",
-                RealWeight: 1.0,
-                WeightMeasure: "KG",
-                Width: 1.1,
-                Depth: 1.2,
-                Height: 1.3,
-                LengthMeasure: "cm",
-                DelvMessage: "",
-                UserData1: "",
-                UserData2: "",
-                UserData3: "",
-                Market: "shopify",
-                ExportDeclarationNo: "",
-                GoodsList: lineItemsWithOrderNumber
-            };
-        } catch (error) {
-            console.error(`[주문 데이터 변환] 주문번호 ${order.name} 처리 중 오류 발생:`, error);
-            throw error;
+        // 주문의 배송 주소 정보 사용
+        const shippingAddress = order.shippingAddress;
+        if (!shippingAddress) {
+            throw new Error(`주문 ${order.orderId}의 배송 주소 정보가 없습니다.`);
         }
-    }));
+
+        return {
+            PackageNo: `${order.orderId}-${lineItemIndex}`,
+            PackageNo2: "",
+            DeliveryServiceCode: "KSE",
+            TrackingNo: "",
+            ToCountry: "JP",
+            ReceiverName: order.displayName,
+            ReceiverNameYomigana: order.displayName,
+            ReceiverTelNo: shippingAddress.phone || "",
+            ReceiverTelNo2: "",
+            ReceiverEmail: "",
+            ReceiverSocialNo: "",
+            ReceiverZipCode: shippingAddress.zip,
+            ReceiverFullAddr: order.address,
+            ReceiverStreet: "",
+            ReceiverCity: "",
+            ReceiverState: "",
+            ReceiverNameEng: "",
+            ReceiverFullAddrEng: "",
+            ReceiverStreetEng: "",
+            ReceiverStateEng: "",
+            ReceiverCityEng: "",
+            RealWeight: 1.0,
+            WeightMeasure: "KG",
+            Width: 1.1,
+            Depth: 1.2,
+            Height: 1.3,
+            LengthMeasure: "cm",
+            DelvMessage: "",
+            UserData1: "",
+            UserData2: "",
+            UserData3: "",
+            Market: "shopify",
+            ExportDeclarationNo: "",
+            GoodsList: lineItemsWithOrderNumber
+        };
+    } catch (error) {
+        console.error(`[주문 데이터 변환] 주문번호 ${order.orderId} 처리 중 오류 발생:`, error);
+        throw error;
+    }
 }
 
 async function getKseApiKey(sessionId) {
@@ -123,15 +97,12 @@ async function getKseApiKey(sessionId) {
     return kseInfo.apiKey;
 }
 
-async function kseApi(id, admin, lineItemIndex) {
-    console.log(`[KSE API] ID ${id}, 라인아이템 인덱스 ${lineItemIndex}에 대한 API 처리 시작`);
+async function kseApi(order, admin, lineItemIndex) {
+    console.log(`[KSE API] 주문번호 ${order.orderId}, 라인아이템 인덱스 ${lineItemIndex}에 대한 API 처리 시작`);
     
     try {
-        const orders = await fetchOrders(id, admin);
-        console.log(`[KSE API] ${orders?.data?.length || 0}개의 주문 조회 완료`);
-
-        const formattedOrders = await formatOrderData(orders, lineItemIndex);
-        console.log(`[KSE API] ${formattedOrders.length}개의 주문 데이터 변환 완료`);
+        const formattedOrder = await formatOrderData(order, lineItemIndex);
+        console.log(`[KSE API] 주문 데이터 변환 완료`);
 
         const apiKey = await getKseApiKey(admin.rest.session.id);
         const kseUrl = process.env.KSE_URL;
@@ -142,7 +113,7 @@ async function kseApi(id, admin, lineItemIndex) {
 
         console.log('[KSE API] KSE API로 요청 전송 중');
         const response = await axios.post(kseUrl, 
-            { DataList: formattedOrders },
+            { DataList: [formattedOrder] },
             {
                 headers: {
                     'Content-Type': 'application/json',

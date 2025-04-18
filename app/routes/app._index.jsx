@@ -16,7 +16,7 @@ export default function Index() {
               KSE 앱에 오신 것을 환영합니다
             </Text>
             <Text variant="bodyMd" as="p">
-              이 앱은 Shopify 주문을 KSE 시스템과 연동하여 관리하는 도구입니다.
+              이 앱은 1acspaces 스토어의 주문을 KSE 시스템과 연동하여 관리하는 도구입니다.
             </Text>
           </Card>
         </Layout.Section>

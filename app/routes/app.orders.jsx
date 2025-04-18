@@ -250,9 +250,9 @@ export default function Orders() {
         <Form method="POST">
           <ui-title-bar title="">
             <button type="button" variant="secondary" onClick={() => revalidator.revalidate()} style={{ marginRight: '10px' }}>
-              Refresh
+              새로고침
             </button>
-            <button type="submit" variant="primary" disabled={isLoading}>Submit</button>
+            <button type="submit" variant="primary" disabled={isLoading}>주문 전송</button>
           </ui-title-bar>
           {isLoading && <LoadingSpinner />}
           <Layout>

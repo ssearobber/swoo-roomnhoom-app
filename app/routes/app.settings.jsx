@@ -71,7 +71,7 @@ export default function SettingsPage() {
       <Form method="POST">
       <ui-title-bar title="">
         <button variant="primary" submit={true} disabled={isLoading}>
-          Save
+          저장
         </button>
       </ui-title-bar>
         {isLoading && <LoadingSpinner />}

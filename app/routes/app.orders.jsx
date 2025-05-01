@@ -185,12 +185,18 @@ export default function Orders() {
 
   const isLoading = navigation.state === "submitting";
 
-  const handleCopy = (text, e) => {
+  const handleCopy = async (text, e) => {
     e.preventDefault();
     e.stopPropagation();
-    navigator.clipboard.writeText(text);
-    setToastMessage("클립보드에 복사되었습니다");
-    setToastActive(true);
+    try {
+      await navigator.clipboard.writeText(text);
+      setToastMessage("클립보드에 복사되었습니다");
+      setToastActive(true);
+    } catch (err) {
+      console.error('클립보드 복사 실패:', err);
+      setToastMessage("클립보드 복사에 실패했습니다");
+      setToastActive(true);
+    }
   };
 
   const dismissToast = () => {
@@ -219,48 +225,60 @@ export default function Orders() {
       onClick={(e) => e.stopPropagation()}
     >
       <IndexTable.Cell>
-        <Text variant="bodyMd" fontWeight="bold" as="span" onClick={(e) => handleCopy(`${orderId} - ${id.split('-')[1]}`, e)} style={{ cursor: 'pointer' }}>
-          {orderId} - {id.split('-')[1]}
-        </Text>
+        <div onClick={(e) => handleCopy(`${orderId} - ${id.split('-')[1]}`, e)} style={{ cursor: 'pointer' }}>
+          <Text variant="bodyMd" fontWeight="bold" as="span">
+            {orderId} - {id.split('-')[1]}
+          </Text>
+        </div>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={(e) => handleCopy(productTitle, e)} style={{ cursor: 'pointer' }}>
-          {productTitle}
-        </Text>
+        <div onClick={(e) => handleCopy(productTitle, e)} style={{ cursor: 'pointer' }}>
+          <Text variant="bodyMd" as="span">
+            {productTitle}
+          </Text>
+        </div>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={(e) => handleCopy(brand, e)} style={{ cursor: 'pointer' }}>
-          {brand}
-        </Text>
+        <div onClick={(e) => handleCopy(brand, e)} style={{ cursor: 'pointer' }}>
+          <Text variant="bodyMd" as="span">
+            {brand}
+          </Text>
+        </div>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={(e) => handleCopy(variantTitle, e)} style={{ cursor: 'pointer' }}>
-          {variantTitle}
-        </Text>
+        <div onClick={(e) => handleCopy(variantTitle, e)} style={{ cursor: 'pointer' }}>
+          <Text variant="bodyMd" as="span">
+            {variantTitle}
+          </Text>
+        </div>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={(e) => handleCopy(quantity, e)} style={{ cursor: 'pointer' }}>
-          {quantity}
-        </Text>
+        <div onClick={(e) => handleCopy(quantity, e)} style={{ cursor: 'pointer' }}>
+          <Text variant="bodyMd" as="span">
+            {quantity}
+          </Text>
+        </div>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={(e) => handleCopy(displayName, e)} style={{ cursor: 'pointer' }}>
-          {displayName}
-        </Text>
+        <div onClick={(e) => handleCopy(displayName, e)} style={{ cursor: 'pointer' }}>
+          <Text variant="bodyMd" as="span">
+            {displayName}
+          </Text>
+        </div>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={(e) => handleCopy(address, e)} style={{ cursor: 'pointer' }}>
-          {address}
-        </Text>
+        <div onClick={(e) => handleCopy(address, e)} style={{ cursor: 'pointer' }}>
+          <Text variant="bodyMd" as="span">
+            {address}
+          </Text>
+        </div>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span">
-          {url ? (
-            <Link url={url} external target="_blank" onClick={(e) => e.stopPropagation()}>
-              {url}
-            </Link>
-          ) : ''}
-        </Text>
+        {url ? (
+          <Link url={url} external target="_blank" onClick={(e) => e.stopPropagation()}>
+            {url}
+          </Link>
+        ) : ''}
       </IndexTable.Cell>
     </IndexTable.Row>
   ));

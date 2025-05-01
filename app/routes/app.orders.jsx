@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { json } from "@remix-run/node";
-import { useLoaderData, useActionData, Form, useNavigation, useRevalidator } from "@remix-run/react";
+import { useLoaderData, useActionData, Form, useNavigation, useRevalidator, useNavigate } from "@remix-run/react";
 import {
   Page,
   Layout,
@@ -141,7 +141,7 @@ export const action = async ({ request }) => {
       return json({ 
         success: false, 
         error: 'KSE API 키가 설정되지 않았습니다. 설정 페이지에서 API 키를 입력해주세요.',
-        redirectTo: `https://admin.shopify.com/store/f13241-2/apps/swoo-roomnhoom-app/app/settings`
+        redirectTo: true
       }, { status: 400 });
     }
 
@@ -192,6 +192,7 @@ export default function Orders() {
   const actionData = useActionData();
   const navigation = useNavigation();
   const revalidator = useRevalidator();
+  const navigate = useNavigate();
   const [toastActive, setToastActive] = useState(false);
   const [toastMessage, setToastMessage] = useState("");
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
@@ -228,10 +229,10 @@ export default function Orders() {
     } else if (actionData?.error) {
       shopify.toast.show(actionData.error);
       if (actionData.redirectTo) {
-        window.location.href = actionData.redirectTo;
+        navigate('/app/settings');
       }
     }
-  }, [actionData]);
+  }, [actionData, navigate]);
 
   const rowMarkup = orders.map(({ id, orderId, displayName, address, productTitle, variantTitle, quantity, brand, url }, index) => (
     <IndexTable.Row 

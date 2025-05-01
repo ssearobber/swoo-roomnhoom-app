@@ -211,7 +211,13 @@ export default function Orders() {
   }, [actionData]);
 
   const rowMarkup = orders.map(({ id, orderId, displayName, address, productTitle, variantTitle, quantity, brand, url }, index) => (
-    <IndexTable.Row id={id} key={id} selected={selectedResources.includes(id)} position={index}>
+    <IndexTable.Row 
+      id={id} 
+      key={id} 
+      selected={selectedResources.includes(id)} 
+      position={index}
+      onClick={(e) => e.stopPropagation()}
+    >
       <IndexTable.Cell>
         <Text variant="bodyMd" fontWeight="bold" as="span" onClick={(e) => handleCopy(`${orderId} - ${id.split('-')[1]}`, e)} style={{ cursor: 'pointer' }}>
           {orderId} - {id.split('-')[1]}
@@ -288,6 +294,9 @@ export default function Orders() {
                     { title: '고객주소' },
                     { title: '상품URL' }
                   ]}
+                  selectable={true}
+                  hasZebraStriping={false}
+                  onRowClick={() => {}}
                 >
                   {rowMarkup}
                 </IndexTable>

@@ -141,7 +141,7 @@ export const action = async ({ request }) => {
       return json({ 
         success: false, 
         error: 'KSE API 키가 설정되지 않았습니다. 설정 페이지에서 API 키를 입력해주세요.',
-        redirectTo: '/app/settings'
+        redirectTo: `${process.env.SHOPIFY_APP_URL}/app/settings`
       }, { status: 400 });
     }
 

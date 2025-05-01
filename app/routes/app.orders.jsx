@@ -15,6 +15,7 @@ import {
 import { authenticate } from "../shopify.server";
 import kseApi from "../utils/kse";
 import LoadingSpinner from "../components/LoadingSpinner";
+import db from "../utils/db";
 
 async function fetchOrders(admin) {
   const query = `
@@ -131,6 +132,19 @@ export const action = async ({ request }) => {
   const results = [];
 
   try {
+    // KSE API 키 확인
+    const kseInfo = await db.kseInformation.findFirst({
+      where: { sessionId: admin.rest.session.id }
+    });
+
+    if (!kseInfo || !kseInfo.apiKey) {
+      return json({ 
+        success: false, 
+        error: 'KSE API 키가 설정되지 않았습니다. 설정 페이지에서 API 키를 입력해주세요.',
+        redirectTo: '/app/settings'
+      }, { status: 400 });
+    }
+
     // 현재 주문 목록을 다시 가져옵니다
     const data = await fetchOrders(admin);
     const currentOrders = data.data.orders.nodes.flatMap(node => 
@@ -213,6 +227,9 @@ export default function Orders() {
       shopify.toast.show(actionData.message);
     } else if (actionData?.error) {
       shopify.toast.show(actionData.error);
+      if (actionData.redirectTo) {
+        window.location.href = actionData.redirectTo;
+      }
     }
   }, [actionData]);
 

@@ -15,7 +15,7 @@ import {
 import { authenticate } from "../shopify.server";
 import kseApi from "../utils/kse";
 import LoadingSpinner from "../components/LoadingSpinner";
-import db from "../utils/db";
+import db from "../db.server";
 
 async function fetchOrders(admin) {
   const query = `

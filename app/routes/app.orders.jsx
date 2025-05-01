@@ -211,37 +211,37 @@ export default function Orders() {
   const rowMarkup = orders.map(({ id, orderId, displayName, address, productTitle, variantTitle, quantity, brand, url }, index) => (
     <IndexTable.Row id={id} key={id} selected={selectedResources.includes(id)} position={index}>
       <IndexTable.Cell>
-        <Text variant="bodyMd" fontWeight="bold" as="span" onClick={() => handleCopy(`${orderId} - ${id.split('-')[1]}`)} style={{ cursor: 'pointer' }}>
+        <Text variant="bodyMd" fontWeight="bold" as="span" onClick={(e) => { e.stopPropagation(); handleCopy(`${orderId} - ${id.split('-')[1]}`); }} style={{ cursor: 'pointer' }}>
           {orderId} - {id.split('-')[1]}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={() => handleCopy(productTitle)} style={{ cursor: 'pointer' }}>
+        <Text variant="bodyMd" as="span" onClick={(e) => { e.stopPropagation(); handleCopy(productTitle); }} style={{ cursor: 'pointer' }}>
           {productTitle}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={() => handleCopy(brand)} style={{ cursor: 'pointer' }}>
+        <Text variant="bodyMd" as="span" onClick={(e) => { e.stopPropagation(); handleCopy(brand); }} style={{ cursor: 'pointer' }}>
           {brand}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={() => handleCopy(variantTitle)} style={{ cursor: 'pointer' }}>
+        <Text variant="bodyMd" as="span" onClick={(e) => { e.stopPropagation(); handleCopy(variantTitle); }} style={{ cursor: 'pointer' }}>
           {variantTitle}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={() => handleCopy(quantity)} style={{ cursor: 'pointer' }}>
+        <Text variant="bodyMd" as="span" onClick={(e) => { e.stopPropagation(); handleCopy(quantity); }} style={{ cursor: 'pointer' }}>
           {quantity}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={() => handleCopy(displayName)} style={{ cursor: 'pointer' }}>
+        <Text variant="bodyMd" as="span" onClick={(e) => { e.stopPropagation(); handleCopy(displayName); }} style={{ cursor: 'pointer' }}>
           {displayName}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span" onClick={() => handleCopy(address)} style={{ cursor: 'pointer' }}>
+        <Text variant="bodyMd" as="span" onClick={(e) => { e.stopPropagation(); handleCopy(address); }} style={{ cursor: 'pointer' }}>
           {address}
         </Text>
       </IndexTable.Cell>

@@ -10,6 +10,7 @@ import {
   useIndexResourceState,
   Frame,
   Link,
+  Toast,
 } from "@shopify/polaris";
 import { authenticate } from "../shopify.server";
 import kseApi from "../utils/kse";
@@ -177,10 +178,22 @@ export default function Orders() {
   const actionData = useActionData();
   const navigation = useNavigation();
   const revalidator = useRevalidator();
+  const [toastActive, setToastActive] = useState(false);
+  const [toastMessage, setToastMessage] = useState("");
   const { selectedResources, allResourcesSelected, handleSelectionChange } =
     useIndexResourceState(orders);
 
   const isLoading = navigation.state === "submitting";
+
+  const handleCopy = (text) => {
+    navigator.clipboard.writeText(text);
+    setToastMessage("클립보드에 복사되었습니다");
+    setToastActive(true);
+  };
+
+  const dismissToast = () => {
+    setToastActive(false);
+  };
 
   // 데이터 체크
   if (!orders || !Array.isArray(orders)) {
@@ -198,37 +211,37 @@ export default function Orders() {
   const rowMarkup = orders.map(({ id, orderId, displayName, address, productTitle, variantTitle, quantity, brand, url }, index) => (
     <IndexTable.Row id={id} key={id} selected={selectedResources.includes(id)} position={index}>
       <IndexTable.Cell>
-        <Text variant="bodyMd" fontWeight="bold" as="span">
+        <Text variant="bodyMd" fontWeight="bold" as="span" onClick={() => handleCopy(`${orderId} - ${id.split('-')[1]}`)} style={{ cursor: 'pointer' }}>
           {orderId} - {id.split('-')[1]}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span">
+        <Text variant="bodyMd" as="span" onClick={() => handleCopy(productTitle)} style={{ cursor: 'pointer' }}>
           {productTitle}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span">
+        <Text variant="bodyMd" as="span" onClick={() => handleCopy(brand)} style={{ cursor: 'pointer' }}>
           {brand}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span">
+        <Text variant="bodyMd" as="span" onClick={() => handleCopy(variantTitle)} style={{ cursor: 'pointer' }}>
           {variantTitle}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span">
+        <Text variant="bodyMd" as="span" onClick={() => handleCopy(quantity)} style={{ cursor: 'pointer' }}>
           {quantity}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span">
+        <Text variant="bodyMd" as="span" onClick={() => handleCopy(displayName)} style={{ cursor: 'pointer' }}>
           {displayName}
         </Text>
       </IndexTable.Cell>
       <IndexTable.Cell>
-        <Text variant="bodyMd" as="span">
+        <Text variant="bodyMd" as="span" onClick={() => handleCopy(address)} style={{ cursor: 'pointer' }}>
           {address}
         </Text>
       </IndexTable.Cell>
@@ -283,6 +296,9 @@ export default function Orders() {
             </Layout.Section>
           </Layout>
         </Form>
+        {toastActive && (
+          <Toast content={toastMessage} onDismiss={dismissToast} />
+        )}
       </Page>
     </Frame>
   );

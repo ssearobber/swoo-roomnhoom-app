@@ -100,6 +100,7 @@ export const loader = async ({ request }) => {
           displayName: node.shippingAddress ? 
             `${node.shippingAddress.firstName} ${node.shippingAddress.lastName}` : 
             node.customer?.displayName || 'No name',
+          phone: node.shippingAddress?.phone || 'No phone',
           address: node.shippingAddress ? 
             `${node.shippingAddress.address1} ${node.shippingAddress.address2 || ''}, ${node.shippingAddress.city}, ${node.shippingAddress.province} ${node.shippingAddress.zip}, ${node.shippingAddress.country}` 
             : node.customer?.defaultAddress ? 
@@ -155,6 +156,7 @@ export const action = async ({ request }) => {
         displayName: node.shippingAddress ? 
           `${node.shippingAddress.firstName} ${node.shippingAddress.lastName}` : 
           node.customer?.displayName || 'No name',
+        phone: node.shippingAddress?.phone || 'No phone',
         address: node.shippingAddress ? 
           `${node.shippingAddress.address1} ${node.shippingAddress.address2 || ''}, ${node.shippingAddress.city}, ${node.shippingAddress.province} ${node.shippingAddress.zip}, ${node.shippingAddress.country}` 
           : node.customer?.defaultAddress ? 
@@ -234,7 +236,7 @@ export default function Orders() {
     }
   }, [actionData, navigate]);
 
-  const rowMarkup = orders.map(({ id, orderId, displayName, address, productTitle, variantTitle, quantity, brand, url }, index) => (
+  const rowMarkup = orders.map(({ id, orderId, displayName, address, productTitle, variantTitle, quantity, brand, url, phone }, index) => (
     <IndexTable.Row 
       id={id} 
       key={id} 
@@ -285,6 +287,13 @@ export default function Orders() {
         </div>
       </IndexTable.Cell>
       <IndexTable.Cell>
+        <div onClick={(e) => handleCopy(phone, e)} style={{ cursor: 'pointer' }}>
+          <Text variant="bodyMd" as="span">
+            {phone}
+          </Text>
+        </div>
+      </IndexTable.Cell>
+      <IndexTable.Cell>
         <div onClick={(e) => handleCopy(address, e)} style={{ cursor: 'pointer' }}>
           <Text variant="bodyMd" as="span">
             {address}
@@ -327,6 +336,7 @@ export default function Orders() {
                     { title: '색상' },
                     { title: '수량' },
                     { title: '고객이름' },
+                    { title: '전화번호' },
                     { title: '고객주소' },
                     { title: '상품URL' }
                   ]}
